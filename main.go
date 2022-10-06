@@ -2,9 +2,10 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"gpt3/config"
+	"gpt3/util"
 	"log"
+	"math/rand"
 	"os"
 	"strconv"
 
@@ -13,61 +14,45 @@ import (
 
 func main() {
 
-	entrada := "Escribir un artículo en español sobre los beneficios del agua de clorofila para adelgazar según nutricionistas 800"
-
+	cadenaDeInstrucciones := `Carlos desea adelantar estudios a nivel tecnológico, su mayor problema radica en que no
+	encuentra una institución cercana que le ofrezca la oportunidad de estudiar lo que desea.
+	Por tal razón acude a un amigo para que lo oriente donde tomar la formación.
+	A partir de lo anterior usted debe proponer alternativas para que Carlos pueda acceder a
+	formación gratuita, incluyente y flexible 350`
 	var err error
-	var result string
-	longitudEntrada := len(entrada)
-	var response string
-	var espacios int = 1
-	palabras, err := strconv.Atoi(string(entrada[len(entrada)-3:]))
-	if err != nil {
-		log.Panic("no hay número al final", err)
-	}
-	entrada = entrada[:longitudEntrada-3]
-	fmt.Println(palabras)
+	var acumuladoFinalDeRespuestas string
+	longitudEntrada := len(cadenaDeInstrucciones)
+	var respuestaDesdeGpt3 string
+	listaDeConjunciones := []string{" sin embargo,", " no obstante,", " pero lo más importante,", " por otro lado,", " tomando en cuenta lo anterior", " y por eso se tiene que", " por eso es bueno que", " complementando lo anterior", " pero"}
 
-	response, err = ObtenerRespuesta(entrada)
+	maxPalabrasSolicitadas, err := strconv.Atoi(string(cadenaDeInstrucciones[len(cadenaDeInstrucciones)-3:]))
+	if err != nil {
+		log.Println("no hay número al final de la instrución", err)
+	}
+	cadenaDeInstrucciones = cadenaDeInstrucciones[:longitudEntrada-3]
+
+	respuestaDesdeGpt3, err = obtenerRespuesta(cadenaDeInstrucciones)
 	if err != nil {
 		log.Println(err)
 	}
-	result += response
+	acumuladoFinalDeRespuestas += respuestaDesdeGpt3
 
-	for i := 0; i < len(result); i++ {
-		if result[i] == ' ' {
-			espacios += 1
-		}
-	}
-	fmt.Println(espacios)
-	
-	for espacios < palabras {
+	ctdPalabrasAcumulado := util.CountWords(acumuladoFinalDeRespuestas)
 
-		espaciosAntes := espacios
-		
-		response, err = ObtenerRespuesta(result)
-		result += response
+	for ctdPalabrasAcumulado <= maxPalabrasSolicitadas {
+
+		acumuladoFinalDeRespuestas += listaDeConjunciones[rand.Intn(len(listaDeConjunciones))]
+
+		respuestaDesdeGpt3, err = obtenerRespuesta(acumuladoFinalDeRespuestas)
 		if err != nil {
 			log.Println(err)
 		}
-		// fmt.Println(response)
-		
-		espacios = 1
-		
-		for i := 0; i < len(result); i++ {
-			if result[i] == ' ' {
-				espacios += 1
-			}
-		}
-		fmt.Println(espacios)
+		acumuladoFinalDeRespuestas += respuestaDesdeGpt3
 
-		if espaciosAntes == espacios {
-			result += " pero"
-		}
-		// if espaciosAntes == espacios {
-			// break
-		// }
+		ctdPalabrasAcumulado = util.CountWords(acumuladoFinalDeRespuestas)
 
 	}
+
 	f, err := os.Create("output.txt")
 
 	if err != nil {
@@ -76,7 +61,7 @@ func main() {
 
 	defer f.Close()
 
-	_, err = f.WriteString(result)
+	_, err = f.WriteString(acumuladoFinalDeRespuestas)
 
 	if err != nil {
 		log.Println(err)
@@ -84,7 +69,7 @@ func main() {
 
 }
 
-func ObtenerRespuesta(promt string) (string, error) {
+func obtenerRespuesta(promt string) (string, error) {
 
 	app := config.InstanceApp()
 	c := gogpt.NewClient(app.Gpt3Token())
